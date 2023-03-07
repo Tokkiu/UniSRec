@@ -37,6 +37,9 @@ def run_baseline(model, dataset, config_file_list=[]):
     elif model_name == 'S3Rec':
         from baselines.s3rec import S3Rec
         model = S3Rec(config, train_data.dataset).to(config['device'])
+    elif model_name == 'SASRec':
+        from baselines.sasrec import SASRec
+        model = SASRec(config, train_data.dataset).to(config['device'])
     else:
         raise NotImplementedError(f'The baseline [{model_name}] has not implemented yet.')
     logger.info(model)
@@ -50,7 +53,9 @@ def run_baseline(model, dataset, config_file_list=[]):
     )
 
     # model evaluation
+    model.pop_label = []
     test_result = trainer.evaluate(test_data, load_best_model=True, show_progress=config['show_progress'])
+    model.cal_curr_pop()
 
     logger.info(set_color('best valid ', 'yellow') + f': {best_valid_result}')
     logger.info(set_color('test result', 'yellow') + f': {test_result}')
@@ -72,7 +77,7 @@ if __name__ == '__main__':
     args, _ = parser.parse_known_args()
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
 
-    if args.model in ['FDSA', 'S3Rec']:
+    if args.model in ['FDSA', 'S3Rec', 'SASRec']:
         baseline_func = run_baseline
     else:
         baseline_func = run_recbole

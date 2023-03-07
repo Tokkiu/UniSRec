@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from recbole.model.sequential_recommender.sasrec import SASRec
+import math
 
 
 class PWLayer(nn.Module):
@@ -63,6 +64,10 @@ class UniSRec(SASRec):
     def __init__(self, config, dataset):
         super().__init__(config, dataset)
 
+        self.config = config
+        self.dataset = dataset
+        self.pop_label = []
+
         self.train_stage = config['train_stage']
         self.temperature = config['temperature']
         self.lam = config['lambda']
@@ -83,6 +88,22 @@ class UniSRec(SASRec):
             config['adaptor_layers'],
             config['adaptor_dropout_prob']
         )
+        self.cal_popular()
+
+    def cal_curr_pop(self):
+        pop = sum(self.pop_label)/10/len(self.pop_label)
+        print('popular rate', pop, 'max', max(self.label), 'count', len(self.pop_label))
+
+    def cal_popular(self):
+        self.label = []
+        self.name = self.config["model"]
+        self.item_cnt = self.dataset.counter(self.dataset.iid_field)
+        for item_k in range(self.n_items):
+            v = self.item_cnt[item_k]
+            v = max(v, 1)
+            nv = round(math.log(v))
+            self.label.append(nv)
+        print("max label", max(self.label))
 
     def forward(self, item_seq, item_emb, item_seq_len):
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
@@ -184,4 +205,9 @@ class UniSRec(SASRec):
         test_items_emb = F.normalize(test_items_emb, dim=-1)
 
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))  # [B n_items]
+        for i in scores.topk(10)[1]:
+            mypop = 0
+            for j in i:
+                mypop += self.label[j]
+            self.pop_label.append(mypop)
         return scores
