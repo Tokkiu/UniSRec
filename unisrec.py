@@ -103,7 +103,7 @@ class UniSRec(SASRec):
             v = max(v, 1)
             nv = round(math.log(v))
             self.label.append(nv)
-        print("max label", max(self.label))
+        print("max label", max(self.label), 'count', len(self.label))
 
     def forward(self, item_seq, item_emb, item_seq_len):
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
