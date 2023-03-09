@@ -23,3 +23,6 @@ plm_suffix: feat1CLS
 plm_size: 768
 adapter_layers: [768, 300]
 train_batch_size: 1024
+
+biasc: 40
+alpha: 1e-3

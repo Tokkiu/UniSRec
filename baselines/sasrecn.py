@@ -71,7 +71,8 @@ class SASRecN(SequentialRecommender):
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
         self.fc_item = torch.nn.Linear(self.hidden_size, 1)
         self.fc_user = torch.nn.Linear(self.hidden_size, 1)
-        self.c = 0.5
+        self.c = config['biasc']
+        self.alpha = config['alpha']
 
         if self.loss_type == "BPR":
             self.loss_fct = BPRLoss()
@@ -158,8 +159,13 @@ class SASRecN(SequentialRecommender):
             item_scores = torch.nn.Sigmoid()(self.fc_item(test_item_emb)).squeeze().unsqueeze(0)
             logits = logits * user_score * item_scores - self.c * user_score * item_scores
 
+            pos_labels, neg_labels = torch.ones_like(user_score), torch.zeros_like(user_score)
+
+            L_u = torch.nn.BCELoss()(user_score, pos_labels) + torch.nn.BCELoss()(user_score, neg_labels)
+            L_i = self.loss_fct(item_scores.repeat(pos_items.size(0), 1), pos_items)
+
             loss = self.loss_fct(logits, pos_items)
-            return loss
+            return loss, self.alpha * L_u, self.alpha * L_i
 
     def predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
