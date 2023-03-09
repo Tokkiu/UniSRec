@@ -16,7 +16,7 @@ def run_baseline(model, dataset, config_file_list=[]):
     print(config_file_list)
 
     # configurations initialization
-    config = Config(model=model_name, dataset=dataset, config_file_list=config_file_list)
+    config = Config(model="SASRec", dataset=dataset, config_file_list=config_file_list)
     init_seed(config['seed'], config['reproducibility'])
     # logger initialization
     init_logger(config)
@@ -40,6 +40,9 @@ def run_baseline(model, dataset, config_file_list=[]):
     elif model_name == 'SASRec':
         from baselines.sasrec import SASRec
         model = SASRec(config, train_data.dataset).to(config['device'])
+    elif model_name == 'SASRecN':
+        from baselines.sasrecn import SASRecN
+        model = SASRecN(config, train_data.dataset).to(config['device'])
     else:
         raise NotImplementedError(f'The baseline [{model_name}] has not implemented yet.')
     logger.info(model)
@@ -77,7 +80,7 @@ if __name__ == '__main__':
     args, _ = parser.parse_known_args()
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
 
-    if args.model in ['FDSA', 'S3Rec', 'SASRec']:
+    if args.model in ['FDSA', 'S3Rec', 'SASRec', 'SASRecN']:
         baseline_func = run_baseline
     else:
         baseline_func = run_recbole

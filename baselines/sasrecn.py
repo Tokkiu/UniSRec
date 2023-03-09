@@ -69,6 +69,9 @@ class SASRecN(SequentialRecommender):
 
         self.LayerNorm = nn.LayerNorm(self.hidden_size, eps=self.layer_norm_eps)
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
+        self.fc_item = torch.nn.Linear(self.hidden_size, 1)
+        self.fc_user = torch.nn.Linear(self.hidden_size, 1)
+        self.c = 0.5
 
         if self.loss_type == "BPR":
             self.loss_fct = BPRLoss()
@@ -150,6 +153,11 @@ class SASRecN(SequentialRecommender):
         else:  # self.loss_type = 'CE'
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
+
+            user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
+            item_scores = torch.nn.Sigmoid()(self.fc_item(test_item_emb)).squeeze().unsqueeze(0)
+            logits = logits * user_score * item_scores - self.c * user_score * item_scores
+
             loss = self.loss_fct(logits, pos_items)
             return loss
 
@@ -160,6 +168,11 @@ class SASRecN(SequentialRecommender):
         seq_output = self.forward(item_seq, item_seq_len)
         test_item_emb = self.item_embedding(test_item)
         scores = torch.mul(seq_output, test_item_emb).sum(dim=1)  # [B]
+
+        user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
+        item_scores = torch.nn.Sigmoid()(self.fc_item(test_item_emb)).squeeze().unsqueeze(0)
+        scores = scores * user_score * item_scores - self.c * user_score * item_scores
+
         return scores
 
     def full_sort_predict(self, interaction):
@@ -168,6 +181,11 @@ class SASRecN(SequentialRecommender):
         seq_output = self.forward(item_seq, item_seq_len)
         test_items_emb = self.item_embedding.weight
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))  # [B n_items]
+
+        user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
+        item_scores = torch.nn.Sigmoid()(self.fc_item(test_items_emb)).squeeze().unsqueeze(0)
+        scores = scores * user_score * item_scores - self.c * user_score * item_scores
+
         for i in scores.topk(10)[1]:
             mypop = 0
             for j in i:
