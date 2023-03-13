@@ -102,17 +102,22 @@ class UniSRec(SASRec):
         print('popular rate', pop, 'max', max(self.label), 'count', len(self.pop_label))
 
     def cal_popular(self):
-        self.label = []
-        max_pop = max(self.pop_label)
+        label = []
         self.name = self.config["model"]
         self.item_cnt = self.dataset.counter(self.dataset.iid_field)
         for item_k in range(self.n_items):
             v = self.item_cnt[item_k]
             v = max(v, 1)
+            label.append(v)
+
+        max_pop = max(self.label)
+        self.label = []
+        for v in self.label:
             nv = round(math.log(v))
             if self.label_strategy == 'avg':
                 nv = round(10*v / max_pop)
             self.label.append(nv)
+
         print("max label", max(self.label), 'count', len(self.label))
 
 
