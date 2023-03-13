@@ -110,7 +110,7 @@ class UniSRec(SASRec):
             v = max(v, 1)
             label.append(v)
 
-        max_pop = max(self.label)
+        max_pop = max(label)
         self.label = []
         for v in self.label:
             nv = round(math.log(v))
