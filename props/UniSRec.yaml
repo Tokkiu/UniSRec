@@ -21,3 +21,4 @@ adaptor_dropout_prob: 0.2
 adaptor_layers: [768,300]
 temperature: 0.07
 n_exps: 8
+vis: False

@@ -93,6 +93,7 @@ class UniSRec(SASRec):
         )
         self.cal_popular()
         self.epoch = 0
+        self.vis = config['vis']
 
     def cal_curr_pop(self):
         pop = sum(self.pop_label)/10/len(self.pop_label)
