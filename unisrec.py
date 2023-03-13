@@ -91,11 +91,11 @@ class UniSRec(SASRec):
             config['adaptor_layers'],
             config['adaptor_dropout_prob']
         )
-        self.cal_popular()
         self.epoch = 0
         self.vis = config['vis']
         self.prefix = config['exp']
         self.label_strategy = config['label']
+        self.cal_popular()
 
     def cal_curr_pop(self):
         pop = sum(self.pop_label)/10/len(self.pop_label)
