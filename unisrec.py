@@ -8,7 +8,7 @@ from sklearn.manifold import TSNE
 from sklearn.datasets import load_iris, load_digits
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-
+import numpy as np
 class PWLayer(nn.Module):
     """Single Parametric Whitening Layer
     """
@@ -112,10 +112,15 @@ class UniSRec(SASRec):
 
         max_pop = max(label)
         self.label = []
-        for v in label:
+        lidx = np.argsort(label)
+
+
+        for i, v in enumerate(label):
             nv = round(math.log(v))
             if self.label_strategy == 'avg':
                 nv = round(10*v / max_pop)
+            if self.label_strategy == 'arg':
+                nv = round(10*lidx[i]/len(lidx))
             self.label.append(nv)
 
         print("max label", max(self.label), 'count', len(self.label))
