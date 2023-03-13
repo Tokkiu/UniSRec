@@ -127,7 +127,7 @@ class UniSRec(SASRec):
     def run_per_epoch(self):
         if self.vis and self.epoch % 20 == 0:
             test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
-            self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
+            self.vis_emb(test_item_emb, self.epoch, exp=self.prefix+"_pop")
 
     def forward(self, item_seq, item_emb, item_seq_len):
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
