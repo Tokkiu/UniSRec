@@ -95,6 +95,7 @@ class UniSRec(SASRec):
         self.vis = config['vis']
         self.prefix = config['exp']
         self.label_strategy = config['label']
+        self.label_count = config['lcnt']
         self.cal_popular()
 
     def cal_curr_pop(self):
@@ -118,9 +119,9 @@ class UniSRec(SASRec):
         for i, v in enumerate(label):
             nv = round(math.log(v))
             if self.label_strategy == 'avg':
-                nv = round(10*v / max_pop)
-            if self.label_strategy == 'arg':
-                nv = round(10*lidx[i]/len(lidx))
+                nv = round(self.label_count * v / max_pop)
+            elif self.label_strategy == 'arg':
+                nv = round(self.label_count * lidx[i]/len(lidx))
             self.label.append(nv)
 
         print("max label", max(self.label), 'count', len(self.label))
