@@ -127,7 +127,7 @@ class UniSRec(SASRec):
 
     def run_per_epoch(self):
         epoch = self.epoch // 17
-        if self.vis and self.epoch % 17 == 0:
+        if self.vis and self.epoch % 34 == 0:
             test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
             self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
 
