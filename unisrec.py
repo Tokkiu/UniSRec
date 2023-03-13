@@ -112,7 +112,7 @@ class UniSRec(SASRec):
 
         max_pop = max(label)
         self.label = []
-        for v in self.label:
+        for v in label:
             nv = round(math.log(v))
             if self.label_strategy == 'avg':
                 nv = round(10*v / max_pop)
