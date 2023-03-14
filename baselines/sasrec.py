@@ -22,7 +22,11 @@ from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
 import math
-
+from sklearn.manifold import TSNE
+from sklearn.datasets import load_iris, load_digits
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import numpy as np
 class SASRec(SequentialRecommender):
     r"""
     SASRec is the first sequential recommender based on self-attentive mechanism.
