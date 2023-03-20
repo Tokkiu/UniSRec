@@ -3,10 +3,24 @@ from logging import getLogger
 import torch
 from recbole.config import Config
 from recbole.data import data_preparation
-from recbole.utils import init_seed, init_logger, get_trainer, set_color
+from recbole.utils import init_seed, init_logger, set_color
 
 from unisrec import UniSRec
 from data.dataset import UniSRecDataset
+import importlib
+
+
+def get_trainer(model_type, model_name):
+    r"""Automatically select trainer class based on model type and model name
+
+    Args:
+        model_type (ModelType): model type
+        model_name (str): model name
+
+    Returns:
+        Trainer: trainer class
+    """
+    return getattr(importlib.import_module('sequential_trainer'), 'Trainer')
 
 
 def finetune(dataset, pretrained_file, fix_enc=True, **kwargs):
@@ -34,7 +48,7 @@ def finetune(dataset, pretrained_file, fix_enc=True, **kwargs):
 
     # Load pre-trained model
     if pretrained_file != '':
-        checkpoint = torch.load(pretrained_file)
+        checkpoint = torch.load(pretrained_file, map_location=torch.device('cpu'))
         logger.info(f'Loading from {pretrained_file}')
         logger.info(f'Transfer [{checkpoint["config"]["dataset"]}] -> [{dataset}]')
         model.load_state_dict(checkpoint['state_dict'], strict=False)

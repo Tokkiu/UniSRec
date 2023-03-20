@@ -2,10 +2,23 @@ import argparse
 from logging import getLogger
 from recbole.config import Config
 from recbole.data import data_preparation
-from recbole.utils import init_seed, init_logger, get_trainer, set_color
+from recbole.utils import init_seed, init_logger, set_color
 from recbole.quick_start import run_recbole
 
 from data.dataset import UniSRecDataset
+import importlib
+
+def get_trainer(model_type, model_name):
+    r"""Automatically select trainer class based on model type and model name
+
+    Args:
+        model_type (ModelType): model type
+        model_name (str): model name
+
+    Returns:
+        Trainer: trainer class
+    """
+    return getattr(importlib.import_module('sequential_trainer'), 'Trainer')
 
 
 def run_baseline(model, dataset, config_file_list=[]):
@@ -43,6 +56,9 @@ def run_baseline(model, dataset, config_file_list=[]):
     elif model_name == 'SASRecN':
         from baselines.sasrecn import SASRecN
         model = SASRecN(config, train_data.dataset).to(config['device'])
+    elif model_name == 'SASRecB':
+        from baselines.sasrecb import SASRecB
+        model = SASRecB(config, train_data.dataset).to(config['device'])
     else:
         raise NotImplementedError(f'The baseline [{model_name}] has not implemented yet.')
     logger.info(model)
@@ -58,10 +74,11 @@ def run_baseline(model, dataset, config_file_list=[]):
     # model evaluation
     model.pop_label = []
     test_result = trainer.evaluate(test_data, load_best_model=True, show_progress=config['show_progress'])
-    model.cal_curr_pop()
 
     logger.info(set_color('best valid ', 'yellow') + f': {best_valid_result}')
     logger.info(set_color('test result', 'yellow') + f': {test_result}')
+
+    model.cal_curr_pop()
 
     return config['model'], config['dataset'], {
         'best_valid_score': best_valid_score,
@@ -80,7 +97,7 @@ if __name__ == '__main__':
     args, _ = parser.parse_known_args()
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
 
-    if args.model in ['FDSA', 'S3Rec', 'SASRec', 'SASRecN']:
+    if args.model in ['FDSA', 'S3Rec', 'SASRec', 'SASRecN', "SASRecB"]:
         baseline_func = run_baseline
     else:
         baseline_func = run_recbole

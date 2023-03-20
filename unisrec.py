@@ -140,9 +140,12 @@ class UniSRec(SASRec):
         plt.legend()
         plt.savefig("./images/" + self.name + "_t_" + exp + "_"+ epoch + ".png", dpi=120)
 
-    def run_per_epoch(self):
-        epoch = self.epoch // 17
-        if self.vis and self.epoch % 34 == 0:
+    def run_before_epoch(self, epoch):
+        return None
+
+    def run_per_epoch(self, epoch):
+        print("per")
+        if self.vis and epoch % 2 == 0:
             test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
             self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
 
@@ -231,8 +234,6 @@ class UniSRec(SASRec):
         logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1)) / self.temperature
         pos_items = interaction[self.POS_ITEM_ID]
         loss = self.loss_fct(logits, pos_items)
-        self.run_per_epoch()
-        self.epoch += 1
         return loss
 
     def full_sort_predict(self, interaction):

@@ -18,7 +18,7 @@ Reference:
 import torch
 from torch import nn
 
-from recbole.model.abstract_recommender import SequentialRecommender
+from baselines.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
 import math
@@ -137,9 +137,8 @@ class SASRec(SequentialRecommender):
         plt.legend()
         plt.savefig("./images/" + self.name + "_t_" + exp + "_"+ epoch + ".png", dpi=120)
 
-    def run_per_epoch(self):
-        epoch = self.epoch // 17
-        if self.vis and self.epoch % 34 == 0:
+    def run_per_epoch(self, epoch):
+        if self.vis and epoch % 2 == 0:
             test_item_emb = self.item_embedding.weight
             self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
 
@@ -181,8 +180,6 @@ class SASRec(SequentialRecommender):
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
         seq_output = self.forward(item_seq, item_seq_len)
         pos_items = interaction[self.POS_ITEM_ID]
-        self.run_per_epoch()
-        self.epoch += 1
         if self.loss_type == "BPR":
             neg_items = interaction[self.NEG_ITEM_ID]
             pos_items_emb = self.item_embedding(pos_items)

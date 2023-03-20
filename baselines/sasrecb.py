@@ -18,13 +18,13 @@ Reference:
 import torch
 from torch import nn
 
-from recbole.model.abstract_recommender import SequentialRecommender
 from baselines.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
-import math
+from sklearn.metrics import f1_score, mean_squared_error
 
-class SASRecN(SequentialRecommender):
+
+class SASRecB(SequentialRecommender):
     r"""
     SASRec is the first sequential recommender based on self-attentive mechanism.
 
@@ -35,27 +35,23 @@ class SASRecN(SequentialRecommender):
     """
 
     def __init__(self, config, dataset):
-        super(SASRecN, self).__init__(config, dataset)
+        super(SASRecB, self).__init__(config, dataset)
 
         # load parameters info
-        self.n_layers = config["n_layers"]
-        self.n_heads = config["n_heads"]
-        self.hidden_size = config["hidden_size"]  # same as embedding_size
-        self.inner_size = config[
-            "inner_size"
-        ]  # the dimensionality in feed-forward layer
-        self.hidden_dropout_prob = config["hidden_dropout_prob"]
-        self.attn_dropout_prob = config["attn_dropout_prob"]
-        self.hidden_act = config["hidden_act"]
-        self.layer_norm_eps = config["layer_norm_eps"]
+        self.n_layers = config['n_layers']
+        self.n_heads = config['n_heads']
+        self.hidden_size = config['hidden_size']  # same as embedding_size
+        self.inner_size = config['inner_size']  # the dimensionality in feed-forward layer
+        self.hidden_dropout_prob = config['hidden_dropout_prob']
+        self.attn_dropout_prob = config['attn_dropout_prob']
+        self.hidden_act = config['hidden_act']
+        self.layer_norm_eps = config['layer_norm_eps']
 
-        self.initializer_range = config["initializer_range"]
-        self.loss_type = config["loss_type"]
+        self.initializer_range = config['initializer_range']
+        self.loss_type = config['loss_type']
 
         # define layers and loss
-        self.item_embedding = nn.Embedding(
-            self.n_items, self.hidden_size, padding_idx=0
-        )
+        self.item_embedding = nn.Embedding(self.n_items, self.hidden_size, padding_idx=0)
         self.position_embedding = nn.Embedding(self.max_seq_length, self.hidden_size)
         self.trm_encoder = TransformerEncoder(
             n_layers=self.n_layers,
@@ -65,49 +61,52 @@ class SASRecN(SequentialRecommender):
             hidden_dropout_prob=self.hidden_dropout_prob,
             attn_dropout_prob=self.attn_dropout_prob,
             hidden_act=self.hidden_act,
-            layer_norm_eps=self.layer_norm_eps,
+            layer_norm_eps=self.layer_norm_eps
         )
 
         self.LayerNorm = nn.LayerNorm(self.hidden_size, eps=self.layer_norm_eps)
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
-        self.fc_item = torch.nn.Linear(self.hidden_size, 1)
-        self.fc_user = torch.nn.Linear(self.hidden_size, 1)
-        self.c = config['biasc']
-        self.alpha = config['alpha']
 
-        if self.loss_type == "BPR":
+        self.bloss = nn.BCELoss()
+        self.sigmoid = nn.Sigmoid()
+        self.item_bias_layer = nn.Linear(self.hidden_size, 1)
+
+        if self.loss_type == 'BPR':
             self.loss_fct = BPRLoss()
-        elif self.loss_type == "CE":
+        elif self.loss_type == 'CE':
             self.loss_fct = nn.CrossEntropyLoss()
         else:
             raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE']!")
 
         # parameters initialization
         self.apply(self._init_weights)
+        self.epoch = 0
+        self.last_bloss = 0
+        self.calcualte_bias_label()
 
-        self.config = config
-        self.dataset = dataset
-        self.pop_label = []
 
-        self.cal_popular()
-
-    def cal_curr_pop(self):
-        pop = sum(self.pop_label)/10/len(self.pop_label)
-        print('popular rate', pop, 'max', max(self.label), 'count', len(self.pop_label))
-
-    def cal_popular(self):
-        self.label = []
-        self.name = self.config["model"]
-        self.item_cnt = self.dataset.counter(self.dataset.iid_field)
+    def calcualte_bias_label(self):
+        bias = []
         for item_k in range(self.n_items):
             v = self.item_cnt[item_k]
             v = max(v, 1)
-            nv = round(math.log(v))
-            self.label.append(nv)
-        print("max label", max(self.label))
+            bias.append(v)
+        bias_bak = bias[:]
+        bias_bak.sort()
+        mid_i = len(bias_bak)//5
+        mid = bias_bak[-mid_i]
+        self.bias_label = []
+        for v in bias:
+            if v > mid:
+                self.bias_label.append(1)
+            else:
+                self.bias_label.append(0)
+        self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32)
+
+        print("mid bias value", mid)
 
     def _init_weights(self, module):
-        """Initialize the weights"""
+        """ Initialize the weights """
         if isinstance(module, (nn.Linear, nn.Embedding)):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
@@ -118,10 +117,24 @@ class SASRecN(SequentialRecommender):
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
 
+    def get_attention_mask(self, item_seq):
+        """Generate left-to-right uni-directional attention mask for multi-head attention."""
+        attention_mask = (item_seq > 0).long()
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
+        # mask for left-to-right unidirectional
+        max_len = attention_mask.size(-1)
+        attn_shape = (1, max_len, max_len)
+        subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)  # torch.uint8
+        subsequent_mask = (subsequent_mask == 0).unsqueeze(1)
+        subsequent_mask = subsequent_mask.long().to(item_seq.device)
+
+        extended_attention_mask = extended_attention_mask * subsequent_mask
+        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        return extended_attention_mask
+
     def forward(self, item_seq, item_seq_len):
-        position_ids = torch.arange(
-            item_seq.size(1), dtype=torch.long, device=item_seq.device
-        )
+        position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
         position_embedding = self.position_embedding(position_ids)
 
@@ -132,19 +145,37 @@ class SASRecN(SequentialRecommender):
 
         extended_attention_mask = self.get_attention_mask(item_seq)
 
-        trm_output = self.trm_encoder(
-            input_emb, extended_attention_mask, output_all_encoded_layers=True
-        )
+        trm_output = self.trm_encoder(input_emb, extended_attention_mask, output_all_encoded_layers=True)
         output = trm_output[-1]
         output = self.gather_indexes(output, item_seq_len - 1)
         return output  # [B H]
 
+    def run_per_epoch(self, epoch):
+        self.predict_bias()
+        return None
+
+    def run_before_epoch(self, epoch):
+        self.epoch = epoch
+        if self.epoch % 2 == 0:
+            for param in self.parameters():
+                param.requires_grad = True
+            self.item_bias_layer.requires_grad = False
+        else:
+            for param in self.parameters():
+                param.requires_grad = False
+            self.item_bias_layer.requires_grad = True
+
     def calculate_loss(self, interaction):
+        if self.epoch % 2 == 1:
+            bloss = self.calculate_bias_loss()
+            self.last_bloss = bloss.item()
+            return torch.tensor(0.0, requires_grad=True), bloss
+
         item_seq = interaction[self.ITEM_SEQ]
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
         seq_output = self.forward(item_seq, item_seq_len)
         pos_items = interaction[self.POS_ITEM_ID]
-        if self.loss_type == "BPR":
+        if self.loss_type == 'BPR':
             neg_items = interaction[self.NEG_ITEM_ID]
             pos_items_emb = self.item_embedding(pos_items)
             neg_items_emb = self.item_embedding(neg_items)
@@ -155,18 +186,15 @@ class SASRecN(SequentialRecommender):
         else:  # self.loss_type = 'CE'
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-
-            user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
-            item_scores = torch.nn.Sigmoid()(self.fc_item(test_item_emb)).squeeze().unsqueeze(0)
-            logits = logits * user_score * item_scores - self.c * user_score * item_scores
-
-            pos_labels, neg_labels = torch.ones_like(user_score), torch.zeros_like(user_score)
-
-            L_u = torch.nn.BCELoss()(user_score, pos_labels) + torch.nn.BCELoss()(user_score, neg_labels)
-            L_i = self.loss_fct(item_scores.repeat(pos_items.size(0), 1), pos_items)
-
             loss = self.loss_fct(logits, pos_items)
-            return loss, self.alpha * L_u, self.alpha * L_i
+            return loss-self.last_bloss, torch.tensor(0.0, requires_grad=True)
+
+    def calculate_bias_loss(self):
+        test_item_emb = self.item_embedding.weight
+        bias_score = self.sigmoid(self.item_bias_layer(test_item_emb))
+        bias_loss = self.bloss(bias_score.squeeze(), self.bias_label)
+        return bias_loss
+
 
     def predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
@@ -175,12 +203,13 @@ class SASRecN(SequentialRecommender):
         seq_output = self.forward(item_seq, item_seq_len)
         test_item_emb = self.item_embedding(test_item)
         scores = torch.mul(seq_output, test_item_emb).sum(dim=1)  # [B]
-
-        user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
-        item_scores = torch.nn.Sigmoid()(self.fc_item(test_item_emb)).squeeze().unsqueeze(0)
-        scores = scores * user_score * item_scores - self.c * user_score * item_scores
-
         return scores
+
+    def predict_bias(self):
+        test_items_emb = self.item_embedding.weight
+        bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
+        report = mean_squared_error(bias_score.squeeze().detach().numpy(), self.bias_label.detach().numpy())
+        print("bias score", report)
 
     def full_sort_predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
@@ -188,14 +217,4 @@ class SASRecN(SequentialRecommender):
         seq_output = self.forward(item_seq, item_seq_len)
         test_items_emb = self.item_embedding.weight
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))  # [B n_items]
-
-        user_score = torch.nn.Sigmoid()(self.fc_user(seq_output)).squeeze().unsqueeze(1)
-        item_scores = torch.nn.Sigmoid()(self.fc_item(test_items_emb)).squeeze().unsqueeze(0)
-        scores = scores * user_score * item_scores - self.c * user_score * item_scores
-
-        for i in scores.topk(10)[1]:
-            mypop = 0
-            for j in i:
-                mypop += self.label[j]
-            self.pop_label.append(mypop)
         return scores
