@@ -78,8 +78,6 @@ def run_baseline(model, dataset, config_file_list=[]):
     logger.info(set_color('best valid ', 'yellow') + f': {best_valid_result}')
     logger.info(set_color('test result', 'yellow') + f': {test_result}')
 
-    model.cal_curr_pop()
-
     return config['model'], config['dataset'], {
         'best_valid_score': best_valid_score,
         'valid_score_bigger': config['valid_metric_bigger'],

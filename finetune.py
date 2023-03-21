@@ -69,9 +69,7 @@ def finetune(dataset, pretrained_file, fix_enc=True, **kwargs):
     )
 
     # model evaluation
-    model.pop_label = []
     test_result = trainer.evaluate(test_data, load_best_model=False, show_progress=config['show_progress'])
-    model.cal_curr_pop()
 
     logger.info(set_color('best valid ', 'yellow') + f': {best_valid_result}')
     logger.info(set_color('test result', 'yellow') + f': {test_result}')

@@ -435,6 +435,7 @@ class Trainer(AbstractTrainer):
         try:
             # Note: interaction without item ids
             scores = self.model.full_sort_predict(interaction.to(self.device))
+            self.model.cal_curr_pop(scores)
         except NotImplementedError:
             inter_len = len(interaction)
             new_inter = interaction.to(self.device).repeat_interleave(self.tot_item_num)

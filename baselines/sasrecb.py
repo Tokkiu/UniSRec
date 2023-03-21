@@ -164,6 +164,7 @@ class SASRecB(SequentialRecommender):
             for param in self.parameters():
                 param.requires_grad = False
             self.item_bias_layer.requires_grad = True
+        super(SASRecB, self).run_before_epoch()
 
     def calculate_loss(self, interaction):
         if self.epoch % 2 == 1:

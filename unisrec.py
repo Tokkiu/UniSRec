@@ -2,13 +2,8 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from recbole.model.sequential_recommender.sasrec import SASRec
-import math
-from sklearn.manifold import TSNE
-from sklearn.datasets import load_iris, load_digits
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
-import numpy as np
+from baselines.sasrec import SASRec
+
 class PWLayer(nn.Module):
     """Single Parametric Whitening Layer
     """
@@ -91,63 +86,6 @@ class UniSRec(SASRec):
             config['adaptor_layers'],
             config['adaptor_dropout_prob']
         )
-        self.epoch = 0
-        self.vis = config['vis']
-        self.prefix = config['exp']
-        self.label_strategy = config['label']
-        self.label_count = config['lcnt']
-        self.cal_popular()
-
-    def cal_curr_pop(self):
-        pop = sum(self.pop_label)/10/len(self.pop_label)
-        print('popular rate', pop, 'max', max(self.label), 'count', len(self.pop_label))
-
-    def cal_popular(self):
-        label = []
-        self.name = self.config["model"]
-        self.item_cnt = self.dataset.counter(self.dataset.iid_field)
-        for item_k in range(self.n_items):
-            v = self.item_cnt[item_k]
-            v = max(v, 1)
-            label.append(v)
-
-        max_pop = max(label)
-        self.label = []
-        lidx = np.argsort(label)
-
-
-        for i, v in enumerate(label):
-            nv = round(math.log(v))
-            if self.label_strategy == 'avg':
-                nv = round(self.label_count * v / max_pop)
-            elif self.label_strategy == 'arg':
-                nv = round(self.label_count * lidx[i]/len(lidx))
-            self.label.append(nv)
-
-        print("max label", max(self.label), 'count', len(self.label))
-
-
-    def vis_emb(self, emb, epoch, labels=None, exp="pop"):
-        x_in = emb.detach().cpu().numpy()
-        epoch = "{0:03d}".format(epoch)
-        X_tsne = TSNE(n_components=2, random_state=33).fit_transform(x_in)
-        plt.figure(figsize=(10, 10))
-        if labels is None:
-            labels = self.label
-        plt.scatter(
-            X_tsne[:, 0], X_tsne[:, 1], c=labels, label="Raw", s=15, cmap="coolwarm"
-        )
-        plt.legend()
-        plt.savefig("./images/" + self.name + "_t_" + exp + "_"+ epoch + ".png", dpi=120)
-
-    def run_before_epoch(self, epoch):
-        return None
-
-    def run_per_epoch(self, epoch):
-        print("per")
-        if self.vis and epoch % 2 == 0:
-            test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
-            self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
 
     def forward(self, item_seq, item_emb, item_seq_len):
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
@@ -249,9 +187,4 @@ class UniSRec(SASRec):
         test_items_emb = F.normalize(test_items_emb, dim=-1)
 
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))  # [B n_items]
-        for i in scores.topk(10)[1]:
-            mypop = 0
-            for j in i:
-                mypop += self.label[j]
-            self.pop_label.append(mypop)
         return scores

@@ -87,24 +87,7 @@ class SASRecN(SequentialRecommender):
 
         self.config = config
         self.dataset = dataset
-        self.pop_label = []
 
-        self.cal_popular()
-
-    def cal_curr_pop(self):
-        pop = sum(self.pop_label)/10/len(self.pop_label)
-        print('popular rate', pop, 'max', max(self.label), 'count', len(self.pop_label))
-
-    def cal_popular(self):
-        self.label = []
-        self.name = self.config["model"]
-        self.item_cnt = self.dataset.counter(self.dataset.iid_field)
-        for item_k in range(self.n_items):
-            v = self.item_cnt[item_k]
-            v = max(v, 1)
-            nv = round(math.log(v))
-            self.label.append(nv)
-        print("max label", max(self.label))
 
     def _init_weights(self, module):
         """Initialize the weights"""

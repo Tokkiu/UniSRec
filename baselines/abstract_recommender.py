@@ -27,6 +27,12 @@ import matplotlib.pyplot as plt
 import os, math
 from collections import defaultdict
 import torch.nn.functional as F
+import math
+from sklearn.manifold import TSNE
+from sklearn.datasets import load_iris, load_digits
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import numpy as np
 
 class AbstractRecommender(nn.Module):
     r"""Base class for all models
@@ -138,18 +144,60 @@ class SequentialRecommender(AbstractRecommender):
         self.n_items = dataset.num(self.ITEM_ID)
 
         self.label = []
+        self.pop_label = []
         self.name = config["model"]
         self.item_cnt = dataset.counter(dataset.iid_field)
+        self.label_strategy = config['label']
+        self.label_count = config['lcnt']
+        self.epoch = 0
+        self.vis = config['vis']
+        self.prefix = config['exp']
+        self.cal_popular()
+        # for item_k in range(self.n_items):
+        #     v = self.item_cnt[item_k]
+        #     v = max(v, 1)
+        #     nv = round(math.log(v))
+        #     self.label.append(nv)
+        # print("max label", max(self.label))
+
+
+    def cal_popular(self):
+        label = []
         for item_k in range(self.n_items):
             v = self.item_cnt[item_k]
             v = max(v, 1)
+            label.append(v)
+
+        max_pop = max(label)
+        self.label = []
+        lidx = np.argsort(label)
+
+
+        for i, v in enumerate(label):
             nv = round(math.log(v))
+            if self.label_strategy == 'avg':
+                nv = round(self.label_count * v / max_pop)
+            elif self.label_strategy == 'arg':
+                nv = round(self.label_count * lidx[i]/len(lidx))
             self.label.append(nv)
-        print("max label", max(self.label))
+
+        print("max label", max(self.label), 'count', len(self.label))
+
+
+    def cal_curr_pop(self, scores):
+        pop_label = []
+        for i in scores.topk(10)[1]:
+            mypop = 0
+            for j in i:
+                mypop += self.label[j]
+            pop_label.append(mypop)
+
+        pop = sum(pop_label)/10/len(pop_label)
+        print('popular rate', pop, 'max', max(self.label), 'count', len(pop_label))
 
 
     def vis_emb(self, emb, epoch, labels=None, exp="pop"):
-        x_in = emb.weight.detach().cpu().numpy()
+        x_in = emb.detach().cpu().numpy()
         epoch = "{0:03d}".format(epoch)
         X_tsne = TSNE(n_components=2, random_state=33).fit_transform(x_in)
         plt.figure(figsize=(10, 10))
@@ -161,19 +209,14 @@ class SequentialRecommender(AbstractRecommender):
         plt.legend()
         plt.savefig("./images/" + self.name + "_t_" + exp + "_"+ epoch + ".png", dpi=120)
 
-        # x_inn = F.normalize(torch.tensor(np.array(x_in)), dim=1, p=2).numpy()
-        # X_tsne = TSNE(n_components=2, random_state=33).fit_transform(x_inn)
-        # plt.figure(figsize=(10, 10))
-        # plt.scatter(
-        #     X_tsne[:, 0],
-        #     X_tsne[:, 1],
-        #     c=self.label,
-        #     label="Norm",
-        #     s=15,
-        #     cmap="coolwarm",
-        # )
-        # plt.legend()
-        # plt.savefig("images/" + self.name + "_tsne_n_" +  exp + "_" + epoch + ".png", dpi=120)
+    def run_before_epoch(self, epoch):
+        return None
+
+    def run_per_epoch(self, epoch):
+        print("per")
+        if self.vis and epoch % 2 == 0:
+            test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
+            self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
 
     def gather_indexes(self, output, gather_index):
         """Gathers the vectors at the specific positions over a minibatch"""
