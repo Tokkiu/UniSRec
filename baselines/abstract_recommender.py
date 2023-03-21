@@ -33,6 +33,8 @@ from sklearn.datasets import load_iris, load_digits
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import roc_auc_score
+
 
 class AbstractRecommender(nn.Module):
     r"""Base class for all models
@@ -227,6 +229,23 @@ class SequentialRecommender(AbstractRecommender):
 
     def init_bias_layer(self):
         self.item_bias_layer = BinaryClassifier(self.hidden_size, self.hidden_size)
+
+
+    def predict_bias(self):
+        test_items_emb = self.item_embedding.weight
+        bias_score = self.item_bias_layer(test_items_emb)
+        score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
+        label = self.bias_label.detach().cpu().numpy()
+        auc = roc_auc_score(label, score)
+        print("bias auc", auc)
+
+
+    def calculate_bias_loss(self):
+        test_item_emb = self.item_embedding.weight
+        bias_score = self.item_bias_layer(test_item_emb)
+        bias_score = bias_score.squeeze()[self.bias_idx]
+        bias_loss = self.bloss(bias_score, self.bias_label)
+        return bias_loss
 
     def calcualte_bias_label(self):
         bias = []

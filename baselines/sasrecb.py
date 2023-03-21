@@ -21,9 +21,7 @@ from torch import nn
 from baselines.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
-from sklearn.metrics import f1_score, mean_squared_error
 
-from sklearn.metrics import roc_auc_score
 
 
 class SASRecB(SequentialRecommender):
@@ -175,12 +173,6 @@ class SASRecB(SequentialRecommender):
             loss = self.loss_fct(logits, pos_items)
             return loss-self.last_bloss, torch.tensor(0.0, requires_grad=True)
 
-    def calculate_bias_loss(self):
-        test_item_emb = self.item_embedding.weight
-        bias_score = self.item_bias_layer(test_item_emb)
-        bias_score = bias_score.squeeze()[self.bias_idx]
-        bias_loss = self.bloss(bias_score, self.bias_label)
-        return bias_loss
 
 
     def predict(self, interaction):
@@ -192,13 +184,6 @@ class SASRecB(SequentialRecommender):
         scores = torch.mul(seq_output, test_item_emb).sum(dim=1)  # [B]
         return scores
 
-    def predict_bias(self):
-        test_items_emb = self.item_embedding.weight
-        bias_score = self.item_bias_layer(test_items_emb)
-        score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
-        label = self.bias_label.detach().cpu().numpy()
-        auc = roc_auc_score(label, score)
-        print("bias auc", auc)
 
     def full_sort_predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]

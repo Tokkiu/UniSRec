@@ -6,6 +6,7 @@ from recbole.data import data_preparation
 from recbole.utils import init_seed, init_logger, set_color
 
 from unisrec import UniSRec
+from unisrecb import UniSRecB
 from data.dataset import UniSRecDataset
 import importlib
 
@@ -23,7 +24,7 @@ def get_trainer(model_type, model_name):
     return getattr(importlib.import_module('sequential_trainer'), 'Trainer')
 
 
-def finetune(dataset, pretrained_file, fix_enc=True, **kwargs):
+def finetune(dataset, pretrained_file, fix_enc=True, bias=False, **kwargs):
     # configurations initialization
     props = ['props/UniSRec.yaml', 'props/finetune.yaml']
     print(props)
@@ -44,11 +45,14 @@ def finetune(dataset, pretrained_file, fix_enc=True, **kwargs):
     train_data, valid_data, test_data = data_preparation(config, dataset)
 
     # model loading and initialization
-    model = UniSRec(config, train_data.dataset).to(config['device'])
+    if bias:
+        model = UniSRecB(config, train_data.dataset).to(config['device'])
+    else:
+        model = UniSRec(config, train_data.dataset).to(config['device'])
 
     # Load pre-trained model
     if pretrained_file != '':
-        checkpoint = torch.load(pretrained_file, map_location=torch.device('cpu'))
+        checkpoint = torch.load(pretrained_file)
         logger.info(f'Loading from {pretrained_file}')
         logger.info(f'Transfer [{checkpoint["config"]["dataset"]}] -> [{dataset}]')
         model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -86,7 +90,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', type=str, default='Scientific', help='dataset name')
     parser.add_argument('-p', type=str, default='', help='pre-trained model path')
     parser.add_argument('-f', type=bool, default=True)
+    parser.add_argument('-b', type=bool, default=False)
     args, unparsed = parser.parse_known_args()
     print(args)
 
-    finetune(args.d, pretrained_file=args.p, fix_enc=args.f)
+    finetune(args.d, pretrained_file=args.p, fix_enc=args.f, bias=args.b)
