@@ -101,11 +101,11 @@ class SASRecB(SequentialRecommender):
         self.bias_idx = []
         bias_cnt, nobias_cnt = 0, 0
         for i, v in enumerate(bias):
-            if v > bias_line:
+            if v >= bias_line:
                 self.bias_label.append(1)
                 self.bias_idx.append(i)
                 bias_cnt += 1
-            elif v < nobias_line:
+            elif v <= nobias_line:
                 self.bias_label.append(0)
                 self.bias_idx.append(i)
                 nobias_cnt += 1
