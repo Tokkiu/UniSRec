@@ -23,6 +23,7 @@ from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
 from sklearn.metrics import f1_score, mean_squared_error
 
+from sklearn.metrics import roc_auc_score
 
 class SASRecB(SequentialRecommender):
     r"""
@@ -224,8 +225,8 @@ class SASRecB(SequentialRecommender):
         score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
         label = self.bias_label.detach().cpu().numpy()
         report = mean_squared_error(score, label)
-        auc = torch.nn.functional.roc_auc_score(label, score)
-        print("bias score", auc, report)
+        auc = roc_auc_score(label, score)
+        print("bias auc", auc, report)
 
     def full_sort_predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
