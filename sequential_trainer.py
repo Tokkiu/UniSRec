@@ -526,9 +526,7 @@ class Trainer(AbstractTrainer):
         self.eval_collector.model_collect(self.model)
         struct = self.eval_collector.get_data_struct()
         result = self.evaluator.evaluate(struct)
-        import pdb; pdb.set_trace()
-        scores_all = torch.cat(scores_all, 1)
-        self.model.cal_curr_pop(scores_all)
+        self.model.cal_curr_pop(torch.cat(scores_all))
         return result
 
     def _spilt_predict(self, interaction, batch_size):
