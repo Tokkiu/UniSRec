@@ -214,7 +214,6 @@ class SequentialRecommender(AbstractRecommender):
         return None
 
     def run_per_epoch(self, epoch):
-        print("per")
         if self.vis and epoch % 2 == 0:
             test_item_emb = self.moe_adaptor(self.plm_embedding.weight)
             self.vis_emb(test_item_emb, epoch, exp=self.prefix+"_pop")
