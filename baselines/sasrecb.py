@@ -103,10 +103,9 @@ class SASRecB(SequentialRecommender):
             if v > bias_line:
                 self.bias_label.append(1)
                 self.bias_idx.append(i)
-            else:
+            elif v < nobias_line:
                 self.bias_label.append(0)
-                if v < nobias_line:
-                    self.bias_idx.append(i)
+                self.bias_idx.append(i)
         self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
 
         print("bias value", bias_line, ", non bias value", nobias_line)
@@ -199,7 +198,8 @@ class SASRecB(SequentialRecommender):
     def calculate_bias_loss(self):
         test_item_emb = self.item_embedding.weight
         bias_score = self.sigmoid(self.item_bias_layer(test_item_emb))
-        bias_loss = self.bloss(bias_score.squeeze(), self.bias_label)
+        bias_score = bias_score.squeeze()[self.bias_idx]
+        bias_loss = self.bloss(bias_score, self.bias_label)
         return bias_loss
 
 
