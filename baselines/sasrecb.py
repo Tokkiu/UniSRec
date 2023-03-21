@@ -25,6 +25,21 @@ from sklearn.metrics import f1_score, mean_squared_error
 
 from sklearn.metrics import roc_auc_score
 
+class BinaryClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(BinaryClassifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return x
+
 class SASRecB(SequentialRecommender):
     r"""
     SASRec is the first sequential recommender based on self-attentive mechanism.
@@ -71,7 +86,8 @@ class SASRecB(SequentialRecommender):
 
         self.bloss = nn.BCELoss()
         self.sigmoid = nn.Sigmoid()
-        self.item_bias_layer = nn.Linear(self.hidden_size, 1)
+        # self.item_bias_layer = nn.Linear(self.hidden_size, 1)
+        self.item_bias_layer = BinaryClassifier(self.hidden_size, self.hidden_size)
 
         if self.loss_type == 'BPR':
             self.loss_fct = BPRLoss()
@@ -171,11 +187,13 @@ class SASRecB(SequentialRecommender):
         if self.epoch % 2 == 0:
             for param in self.parameters():
                 param.requires_grad = True
-            self.item_bias_layer.requires_grad = False
+            for param in self.item_bias_layer.parameters():
+                param.requires_grad = False
         else:
             for param in self.parameters():
                 param.requires_grad = False
-            self.item_bias_layer.requires_grad = True
+            for param in self.item_bias_layer.parameters():
+                param.requires_grad = True
         super(SASRecB, self).run_before_epoch(epoch)
 
     def calculate_loss(self, interaction):
@@ -224,9 +242,8 @@ class SASRecB(SequentialRecommender):
         bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
         score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
         label = self.bias_label.detach().cpu().numpy()
-        report = mean_squared_error(score, label)
         auc = roc_auc_score(label, score)
-        print("bias auc", auc, report)
+        print("bias auc", auc)
 
     def full_sort_predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
