@@ -91,6 +91,7 @@ class UniSRecB(SASRec):
         self.init_bias_layer()
         self.epoch = 0
         self.last_bloss = 0
+        self.b_ratio = config['bratio']
         self.calcualte_bias_label()
 
 

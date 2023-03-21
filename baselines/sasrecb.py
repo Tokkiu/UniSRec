@@ -49,7 +49,6 @@ class SASRecB(SequentialRecommender):
 
         self.initializer_range = config['initializer_range']
         self.loss_type = config['loss_type']
-        self.b_ratio = config['bratio']
 
         # define layers and loss
         self.item_embedding = nn.Embedding(self.n_items, self.hidden_size, padding_idx=0)
@@ -80,6 +79,7 @@ class SASRecB(SequentialRecommender):
         self.init_bias_layer()
         self.epoch = 0
         self.last_bloss = 0
+        self.b_ratio = config['bratio']
         self.calcualte_bias_label()
 
         self.apply(self._init_weights)
