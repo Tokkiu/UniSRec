@@ -224,7 +224,8 @@ class SASRecB(SequentialRecommender):
         score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
         label = self.bias_label.detach().cpu().numpy()
         report = mean_squared_error(score, label)
-        print("bias score", report)
+        auc = torch.nn.functional.roc_auc_score(label, score)
+        print("bias score", auc, report)
 
     def full_sort_predict(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
