@@ -215,14 +215,9 @@ class SASRecB(SequentialRecommender):
     def predict_bias(self):
         test_items_emb = self.item_embedding.weight
         bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
-        score = bias_score.squeeze().detach().cpu().numpy()
+        score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
         label = self.bias_label.detach().cpu().numpy()
-        nscore, nlabel = [], []
-        for i in self.bias_idx:
-            nscore.append(score[i])
-            nlabel.append(label[i])
-
-        report = mean_squared_error(nscore, nlabel)
+        report = mean_squared_error(score, label)
         print("bias score", report)
 
     def full_sort_predict(self, interaction):
