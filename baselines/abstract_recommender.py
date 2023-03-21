@@ -142,6 +142,7 @@ class SequentialRecommender(AbstractRecommender):
         self.NEG_ITEM_ID = config['NEG_PREFIX'] + self.ITEM_ID
         self.max_seq_length = config['MAX_ITEM_LIST_LENGTH']
         self.n_items = dataset.num(self.ITEM_ID)
+        self.device = config['device']
 
         self.label = []
         self.pop_label = []

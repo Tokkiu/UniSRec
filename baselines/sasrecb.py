@@ -101,7 +101,7 @@ class SASRecB(SequentialRecommender):
                 self.bias_label.append(1)
             else:
                 self.bias_label.append(0)
-        self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32)
+        self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
 
         print("mid bias value", mid)
 
@@ -209,7 +209,7 @@ class SASRecB(SequentialRecommender):
     def predict_bias(self):
         test_items_emb = self.item_embedding.weight
         bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
-        report = mean_squared_error(bias_score.squeeze().detach().numpy(), self.bias_label.detach().numpy())
+        report = mean_squared_error(bias_score.squeeze().detach().cpu().numpy(), self.bias_label.detach().cpu().numpy())
         print("bias score", report)
 
     def full_sort_predict(self, interaction):
