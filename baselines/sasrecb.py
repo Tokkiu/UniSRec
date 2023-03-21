@@ -95,16 +95,21 @@ class SASRecB(SequentialRecommender):
         bias_bak = bias[:]
         bias_bak.sort()
         mid_i = int(len(bias_bak) * self.b_ratio)
-        mid = bias_bak[-mid_i]
+        bias_line = bias_bak[-mid_i]
+        nobias_line = bias_bak[mid_i]
         self.bias_label = []
-        for v in bias:
-            if v > mid:
+        self.bias_idx = []
+        for i, v in enumerate(bias):
+            if v > bias_line:
                 self.bias_label.append(1)
+                self.bias_idx.append(i)
             else:
                 self.bias_label.append(0)
+                if v < nobias_line:
+                    self.bias_idx.append(i)
         self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
 
-        print("mid bias value", mid)
+        print("bias value", bias_line, ", non bias value", nobias_line)
 
     def _init_weights(self, module):
         """ Initialize the weights """
@@ -210,7 +215,14 @@ class SASRecB(SequentialRecommender):
     def predict_bias(self):
         test_items_emb = self.item_embedding.weight
         bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
-        report = mean_squared_error(bias_score.squeeze().detach().cpu().numpy(), self.bias_label.detach().cpu().numpy())
+        score = bias_score.squeeze().detach().cpu().numpy()
+        label = self.bias_label.detach().cpu().numpy()
+        nscore, nlabel = [], []
+        for i in self.bias_idx:
+            nscore.append(score[i])
+            nlabel.append(label[i])
+
+        report = mean_squared_error(nscore, nlabel)
         print("bias score", report)
 
     def full_sort_predict(self, interaction):
