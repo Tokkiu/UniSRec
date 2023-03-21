@@ -25,20 +25,6 @@ from sklearn.metrics import f1_score, mean_squared_error
 
 from sklearn.metrics import roc_auc_score
 
-class BinaryClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(BinaryClassifier, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, 1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.sigmoid(x)
-        return x
 
 class SASRecB(SequentialRecommender):
     r"""
@@ -84,11 +70,6 @@ class SASRecB(SequentialRecommender):
         self.LayerNorm = nn.LayerNorm(self.hidden_size, eps=self.layer_norm_eps)
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
 
-        self.bloss = nn.BCELoss()
-        self.sigmoid = nn.Sigmoid()
-        # self.item_bias_layer = nn.Linear(self.hidden_size, 1)
-        self.item_bias_layer = BinaryClassifier(self.hidden_size, self.hidden_size)
-
         if self.loss_type == 'BPR':
             self.loss_fct = BPRLoss()
         elif self.loss_type == 'CE':
@@ -97,41 +78,15 @@ class SASRecB(SequentialRecommender):
             raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE']!")
 
         # parameters initialization
-        self.apply(self._init_weights)
+        self.bloss = nn.BCELoss()
+        self.init_bias_layer()
         self.epoch = 0
         self.last_bloss = 0
         self.calcualte_bias_label()
 
+        self.apply(self._init_weights)
 
-    def calcualte_bias_label(self):
-        bias = []
-        for item_k in range(self.n_items):
-            v = self.item_cnt[item_k]
-            v = max(v, 1)
-            bias.append(v)
-        bias_bak = bias[:]
-        bias_bak.sort()
-        mid_i = int(len(bias_bak) * self.b_ratio)
-        bias_line = bias_bak[-mid_i]
-        nobias_line = bias_bak[mid_i]
-        self.bias_label = []
-        self.bias_idx = []
-        bias_cnt, nobias_cnt = 0, 0
-        for i, v in enumerate(bias):
-            if v >= bias_line:
-                self.bias_label.append(1)
-                self.bias_idx.append(i)
-                bias_cnt += 1
-            elif v <= nobias_line:
-                if mid_i < nobias_cnt:
-                    continue
-                self.bias_label.append(0)
-                self.bias_idx.append(i)
-                nobias_cnt += 1
 
-        self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
-
-        print("bias value", bias_line, "count", bias_cnt, ", non bias value", nobias_line, "count", nobias_cnt)
 
     def _init_weights(self, module):
         """ Initialize the weights """
@@ -222,7 +177,7 @@ class SASRecB(SequentialRecommender):
 
     def calculate_bias_loss(self):
         test_item_emb = self.item_embedding.weight
-        bias_score = self.sigmoid(self.item_bias_layer(test_item_emb))
+        bias_score = self.item_bias_layer(test_item_emb)
         bias_score = bias_score.squeeze()[self.bias_idx]
         bias_loss = self.bloss(bias_score, self.bias_label)
         return bias_loss
@@ -239,7 +194,7 @@ class SASRecB(SequentialRecommender):
 
     def predict_bias(self):
         test_items_emb = self.item_embedding.weight
-        bias_score = self.sigmoid(self.item_bias_layer(test_items_emb))
+        bias_score = self.item_bias_layer(test_items_emb)
         score = bias_score.squeeze()[self.bias_idx].detach().cpu().numpy()
         label = self.bias_label.detach().cpu().numpy()
         auc = roc_auc_score(label, score)

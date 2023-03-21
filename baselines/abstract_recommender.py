@@ -123,6 +123,20 @@ class GeneralRecommender(AbstractRecommender):
         self.device = config['device']
 
 
+class BinaryClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(BinaryClassifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return x
 
 class SequentialRecommender(AbstractRecommender):
     """
@@ -209,6 +223,40 @@ class SequentialRecommender(AbstractRecommender):
         )
         plt.legend()
         plt.savefig("./images/" + self.name + "_t_" + exp + "_"+ epoch + ".png", dpi=120)
+
+
+    def init_bias_layer(self):
+        self.item_bias_layer = BinaryClassifier(self.hidden_size, self.hidden_size)
+
+    def calcualte_bias_label(self):
+        bias = []
+        for item_k in range(self.n_items):
+            v = self.item_cnt[item_k]
+            v = max(v, 1)
+            bias.append(v)
+        bias_bak = bias[:]
+        bias_bak.sort()
+        mid_i = int(len(bias_bak) * self.b_ratio)
+        bias_line = bias_bak[-mid_i]
+        nobias_line = bias_bak[mid_i]
+        self.bias_label = []
+        self.bias_idx = []
+        bias_cnt, nobias_cnt = 0, 0
+        for i, v in enumerate(bias):
+            if v >= bias_line:
+                self.bias_label.append(1)
+                self.bias_idx.append(i)
+                bias_cnt += 1
+            elif v <= nobias_line:
+                if mid_i < nobias_cnt:
+                    continue
+                self.bias_label.append(0)
+                self.bias_idx.append(i)
+                nobias_cnt += 1
+
+        self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
+
+        print("bias value", bias_line, "count", bias_cnt, ", non bias value", nobias_line, "count", nobias_cnt)
 
     def run_before_epoch(self, epoch):
         return None
