@@ -435,7 +435,6 @@ class Trainer(AbstractTrainer):
         try:
             # Note: interaction without item ids
             scores = self.model.full_sort_predict(interaction.to(self.device))
-            self.model.cal_curr_pop(scores)
         except NotImplementedError:
             inter_len = len(interaction)
             new_inter = interaction.to(self.device).repeat_interleave(self.tot_item_num)
@@ -517,15 +516,18 @@ class Trainer(AbstractTrainer):
                 desc=set_color(f"Evaluate   ", 'pink'),
             ) if show_progress else eval_data
         )
+        scores_all = []
         for batch_idx, batched_data in enumerate(iter_data):
             interaction, scores, positive_u, positive_i = eval_func(batched_data)
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(set_color('GPU RAM: ' + get_gpu_usage(self.device), 'yellow'))
             self.eval_collector.eval_batch_collect(scores, interaction, positive_u, positive_i)
+            scores_all.append(scores)
         self.eval_collector.model_collect(self.model)
         struct = self.eval_collector.get_data_struct()
         result = self.evaluator.evaluate(struct)
-
+        scores_all = torch.cat(scores_all, 1)
+        self.model.cal_curr_pop(scores_all)
         return result
 
     def _spilt_predict(self, interaction, batch_size):
