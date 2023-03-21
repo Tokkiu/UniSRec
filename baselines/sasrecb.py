@@ -99,16 +99,19 @@ class SASRecB(SequentialRecommender):
         nobias_line = bias_bak[mid_i]
         self.bias_label = []
         self.bias_idx = []
+        bias_cnt, nobias_cnt = 0, 0
         for i, v in enumerate(bias):
             if v > bias_line:
                 self.bias_label.append(1)
                 self.bias_idx.append(i)
+                bias_cnt += 1
             elif v < nobias_line:
                 self.bias_label.append(0)
                 self.bias_idx.append(i)
+                nobias_cnt += 1
         self.bias_label = torch.tensor(self.bias_label, requires_grad=True, dtype=torch.float32).to(self.device)
 
-        print("bias value", bias_line, ", non bias value", nobias_line)
+        print("bias value", bias_line, "count", bias_cnt, ", non bias value", nobias_line, "count", nobias_cnt)
 
     def _init_weights(self, module):
         """ Initialize the weights """
